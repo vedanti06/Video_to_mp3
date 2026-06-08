@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Video → MP3 (demo)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin-top: 1rem; }
+    input[type="file"] { margin-top: 0.25rem; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    #log { margin-top: 1rem; white-space: pre-wrap; background: #111; color: #eee; padding: 1rem; border-radius: 6px; font-size: 0.85rem; }
+    a#dl { display: inline-block; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Upload video → download MP3</h1>
+  <p>Set <strong>API base</strong> to your port-forward URL (e.g. <code>http://127.0.0.1:8080</code>).</p>
+
+  <label>API base <input id="base" type="text" value="http://127.0.0.1:8080" size="40" /></label>
+  <label>Email <input id="email" type="email" autocomplete="username" /></label>
+  <label>Password <input id="password" type="password" autocomplete="current-password" /></label>
+  <label>Video file <input id="file" type="file" accept="video/*" /></label>
+  <button type="button" id="go">Login, upload, wait for MP3</button>
+  <button type="button" id="reg">Register new account</button>
+  <div id="log"></div>
+  <a id="dl" style="display:none" download="converted.mp3">Download MP3</a>
+
+  <script>
+    const log = (m) => { document.getElementById("log").textContent += m + "\n"; };
+    async function getToken(register = false) {
+      const base = document.getElementById("base").value.replace(/\/$/, "");
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      if (!email || !password) { log("Enter email and password."); return null; }
+      const url = register ? `${base}/register` : `${base}/login`;
+      const loginRes = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await loginRes.json().catch(() => ({}));
+      if (!loginRes.ok) { log((register ? "Register" : "Login") + " failed: " + (body.error || JSON.stringify(body))); return null; }
+      log((register ? "Registered" : "Logged in") + ", got JWT.");
+      return body.token;
+    }
+
+    document.getElementById("reg").onclick = async () => {
+      document.getElementById("log").textContent = "";
+      await getToken(true);
+    };
+
+    document.getElementById("go").onclick = async () => {
+      document.getElementById("log").textContent = "";
+      document.getElementById("dl").style.display = "none";
+      const base = document.getElementById("base").value.replace(/\/$/, "");
+      const file = document.getElementById("file").files[0];
+      if (!file) { log("Choose a video file."); return; }
+
+      const token = await getToken(false);
+      if (!token) return;
+
+      const fd = new FormData();
+      fd.append("file", file);
+      const upRes = await fetch(`${base}/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const upBody = await upRes.json().catch(() => ({}));
+      if (!upRes.ok) { log("Upload failed: " + JSON.stringify(upBody || (await upRes.text()))); return; }
+      const videoFid = upBody.video_fid;
+      log("Uploaded, video_fid=" + videoFid);
+
+      let mp3Fid = null;
+      for (let i = 0; i < 120 && !mp3Fid; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const st = await fetch(`${base}/status?video_fid=${encodeURIComponent(videoFid)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const stJ = await st.json();
+        if (stJ.ready) { mp3Fid = stJ.mp3_fid; log("MP3 ready, mp3_fid=" + mp3Fid); break; }
+        log("Poll " + (i + 1) + "…");
+      }
+      if (!mp3Fid) { log("Timed out waiting for conversion."); return; }
+
+      const dlUrl = `${base}/download?mp3_fid=${encodeURIComponent(mp3Fid)}`;
+      const a = document.getElementById("dl");
+      a.href = dlUrl;
+      a.style.display = "inline-block";
+      log("Use Download link (same browser session) or open URL with Authorization header.");
+      a.onclick = async (e) => {
+        e.preventDefault();
+        const r = await fetch(dlUrl, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) { log("Download failed " + r.status); return; }
+        const blob = await r.blob();
+        const u = URL.createObjectURL(blob);
+        const t = document.createElement("a");
+        t.href = u; t.download = "converted.mp3"; t.click();
+        URL.revokeObjectURL(u);
+      };
+    };
+  </script>
+  <p><small>Serve this file over HTTP (not file://), e.g. from repo root: <code>npx --yes serve frontend -p 3333</code> then open <code>http://localhost:3333/demo.html</code>.</small></p>
+</body>
+</html>

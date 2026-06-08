@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video to MP3</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%; padding: 0.6rem 0.75rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+    button {
+      padding: 0.55rem 1rem; border-radius: 6px; border: none; cursor: pointer;
+      font-weight: 600; font-size: 0.9rem;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .hidden { display: none !important; }
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end; }
+    .row > * { flex: 1; min-width: 140px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .badge {
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .badge-processing { background: #422006; color: var(--warn); }
+    .badge-ready { background: #052e16; color: var(--ok); }
+    .badge-failed { background: #450a0a; color: var(--err); }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .user-email { color: var(--muted); font-size: 0.9rem; }
+    #msg { color: var(--err); font-size: 0.85rem; min-height: 1.2rem; margin-top: 0.5rem; }
+    .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="auth-view">
+      <h1>Video to MP3</h1>
+      <p class="sub">Sign in to upload videos and manage your conversions.</p>
+      <div class="card">
+        <label>API base URL</label>
+        <input id="api-base" type="text" value="http://127.0.0.1:8080" />
+        <div class="tabs">
+          <button type="button" id="tab-login" class="btn-ghost active">Login</button>
+          <button type="button" id="tab-register" class="btn-ghost">Register</button>
+        </div>
+        <label>Email</label>
+        <input id="email" type="email" autocomplete="username" />
+        <label>Password</label>
+        <input id="password" type="password" autocomplete="current-password" />
+        <button type="button" id="auth-btn" class="btn-primary">Login</button>
+        <div id="msg"></div>
+      </div>
+    </div>
+
+    <div id="app-view" class="hidden">
+      <div class="header-bar">
+        <div>
+          <h1>My conversions</h1>
+          <p class="sub user-email" id="user-label"></p>
+        </div>
+        <button type="button" id="logout-btn" class="btn-ghost">Log out</button>
+      </div>
+
+      <div class="card">
+        <h2 style="margin:0 0 1rem;font-size:1rem;">Upload video</h2>
+        <div class="row">
+          <div>
+            <label>Video file</label>
+            <input id="video-file" type="file" accept="video/*" />
+          </div>
+          <div style="flex:0;">
+            <button type="button" id="upload-btn" class="btn-primary">Upload</button>
+          </div>
+        </div>
+        <div id="upload-msg" style="margin-top:0.5rem;font-size:0.85rem;color:var(--muted);"></div>
+      </div>
+
+      <div class="card">
+        <div class="header-bar" style="margin-bottom:0.5rem;">
+          <h2 style="margin:0;font-size:1rem;">Your files</h2>
+          <button type="button" id="refresh-btn" class="btn-ghost btn-sm">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Filename</th>
+              <th>Status</th>
+              <th>Uploaded</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody id="files-body">
+            <tr><td colspan="4" style="color:var(--muted);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let token = localStorage.getItem("token") || "";
+    let userEmail = localStorage.getItem("email") || "";
+    let authMode = "login";
+    let pollTimer = null;
+
+    function apiBase() {
+      return $("api-base").value.replace(/\/$/, "");
+    }
+
+    function showMsg(el, text, isErr = true) {
+      el.textContent = text || "";
+      el.style.color = isErr ? "var(--err)" : "var(--ok)";
+    }
+
+    function setView(loggedIn) {
+      $("auth-view").classList.toggle("hidden", loggedIn);
+      $("app-view").classList.toggle("hidden", !loggedIn);
+      if (loggedIn) {
+        $("user-label").textContent = userEmail;
+        loadFiles();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    }
+
+    $("tab-login").onclick = () => {
+      authMode = "login";
+      $("tab-login").classList.add("active");
+      $("tab-register").classList.remove("active");
+      $("auth-btn").textContent = "Login";
+    };
+    $("tab-register").onclick = () => {
+      authMode = "register";
+      $("tab-register").classList.add("active");
+      $("tab-login").classList.remove("active");
+      $("auth-btn").textContent = "Register";
+    };
+
+    async function authRequest() {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      if (!email || !password) {
+        showMsg($("msg"), "Enter email and password.");
+        return;
+      }
+      const path = authMode === "register" ? "/register" : "/login";
+      const res = await fetch(`${apiBase()}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMsg($("msg"), body.error || "Authentication failed");
+        return;
+      }
+      token = body.token;
+      userEmail = email;
+      localStorage.setItem("token", token);
+      localStorage.setItem("email", userEmail);
+      localStorage.setItem("apiBase", apiBase());
+      showMsg($("msg"), "", false);
+      setView(true);
+    }
+
+    $("auth-btn").onclick = authRequest;
+
+    $("logout-btn").onclick = () => {
+      token = "";
+      userEmail = "";
+      localStorage.removeItem("token");
+      localStorage.removeItem("email");
+      setView(false);
+    };
+
+    async function apiFetch(path, opts = {}) {
+      return fetch(`${apiBase()}${path}`, {
+        ...opts,
+        headers: {
+          ...(opts.headers || {}),
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    }
+
+    async function loadFiles() {
+      const tbody = $("files-body");
+      try {
+        const res = await apiFetch("/files");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+        const files = data.files || [];
+        if (!files.length) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">No conversions yet. Upload a video above.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = files.map((f) => {
+          const badgeClass = f.status === "ready" ? "badge-ready" : f.status === "failed" ? "badge-failed" : "badge-processing";
+          const date = f.created_at ? new Date(f.created_at).toLocaleString() : "—";
+          let downloads = `<a href="#" class="btn-sm btn-ghost" data-dl="video" data-id="${f.video_fid}">Video</a>`;
+          if (f.status === "ready" && f.mp3_fid) {
+            downloads += ` <a href="#" class="btn-sm btn-primary" data-dl="mp3" data-id="${f.mp3_fid}">MP3</a>`;
+          } else if (f.status === "processing") {
+            downloads += ` <span style="color:var(--muted);font-size:0.8rem;">MP3 pending…</span>`;
+          }
+          return `<tr>
+            <td>${escapeHtml(f.filename)}</td>
+            <td><span class="badge badge-${f.status}">${f.status}</span></td>
+            <td>${date}</td>
+            <td class="actions">${downloads}</td>
+          </tr>`;
+        }).join("");
+
+        tbody.querySelectorAll("[data-dl]").forEach((a) => {
+          a.onclick = async (e) => {
+            e.preventDefault();
+            const kind = a.dataset.dl;
+            const id = a.dataset.id;
+            const q = kind === "mp3" ? `mp3_fid=${id}` : `video_fid=${id}`;
+            const r = await apiFetch(`/download?${q}`);
+            if (!r.ok) { alert("Download failed"); return; }
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            const t = document.createElement("a");
+            t.href = url;
+            t.download = kind === "mp3" ? "audio.mp3" : "video.mp4";
+            t.click();
+            URL.revokeObjectURL(url);
+          };
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--err);">${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    $("refresh-btn").onclick = loadFiles;
+
+    $("upload-btn").onclick = async () => {
+      const file = $("video-file").files[0];
+      if (!file) { showMsg($("upload-msg"), "Choose a video file.", true); return; }
+      showMsg($("upload-msg"), "Uploading…", false);
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiFetch("/upload", { method: "POST", body: fd });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showMsg($("upload-msg"), body.error || "Upload failed", true);
+        return;
+      }
+      showMsg($("upload-msg"), `Uploaded ${body.filename || file.name}`, false);
+      $("video-file").value = "";
+      loadFiles();
+    };
+
+    function startPolling() {
+      stopPolling();
+      pollTimer = setInterval(() => {
+        const hasProcessing = [...document.querySelectorAll(".badge-processing")].length;
+        if (hasProcessing) loadFiles();
+      }, 3000);
+    }
+
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    if (localStorage.getItem("apiBase")) {
+      $("api-base").value = localStorage.getItem("apiBase");
+    }
+    if (token && userEmail) setView(true);
+  </script>
+</body>
+</html>

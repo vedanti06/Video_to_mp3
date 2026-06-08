@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets (never commit)
+.env
+*.pem
+
+# Large test video optional — remove this line if you want videofile.mp4 in repo
+# convertor/videofile.mp4

@@ -1,0 +1,15 @@
+# service- group of pods
+# service scales to multiple pods and a selector (label) marks all the scaled pods with a same label to denote they are of the same group
+# requests hit service which then distribute req to pods in round robin manner
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+spec:
+  selector:
+    app: gateway
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
